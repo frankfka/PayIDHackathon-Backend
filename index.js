@@ -27,3 +27,7 @@ function start() {
 }
 
 start()
+
+app.use(function (req, res) {
+    res.status(404).send('Route not found');
+});
