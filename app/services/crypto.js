@@ -20,7 +20,7 @@ module.exports.getAddressMap = async function(payId){
     return paymentOptions
 }
 
-module.exports.XpringTest = async function() {
+module.exports.xpringTest = async function() {
     return payIdClient.allAddressesForPayId("frankfka$xpring.money")
 }
 
@@ -34,16 +34,24 @@ module.exports.getCurrentExchangeRate = async function(paymentDocument) {
         paymentOptions: [
                 {
                     currencyCode: 'BTC',
-                    address: 12356567,
+                    paymentInfo: {
+                        address: 12356567,
+                    },
+                    value: 300
+
                     
                 }, 
                 {
                     currencyCode: 'ACH',
-                    address: 12356567,
-                    tag: ''
+                    paymentInfo {
+                        address: 12356567,
+                        tag: ''
+                    }
+                    value: 12300
                 },
             ]
     }*/
+
     var paymentOptions = paymentDocument.paymentOptions
     const requestedValue = R.path(['requestedAmount', 'value'], paymentDocument)
     const fsyms = paymentDocument.requestedAmount.currencyCode
