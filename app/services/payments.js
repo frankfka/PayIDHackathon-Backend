@@ -5,7 +5,7 @@ const { logger } = require('./logging')
 
 exports.create = async function(req, res) {
     logger.info(`[PAYMENTS] Received payment create request`)
-    
+
     Payment.create(req.body)
         .then((savedFile) => {
             res.json(savedFile._id)
@@ -18,6 +18,9 @@ exports.create = async function(req, res) {
 exports.test_create = async function(req, res) {
     logger.info(`[PAYMENTS] Received payment test-create request`)
 
+    req.body.name = "test"
+    req.body.customMessage = "test"
+
     req.body.paymentOptions = await currencyService.getAddressMap("frankfka$xpring.money");
 
     Payment.create(req.body)
@@ -29,7 +32,7 @@ exports.test_create = async function(req, res) {
         })
 }
 
-exports.find = async function(req, res) {
+exports.delete = async function(req, res) {
     Payment.deleteOne().where('_id').eq(req.params.id).then(() => {
         res.send(204)
     }).catch(err => {

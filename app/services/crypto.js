@@ -8,9 +8,11 @@ const axios = require('axios');
 module.exports.getAddressMap = async function (payId){
     const addresses = await payIdClient.allAddressesForPayId(payId)
     const paymentOptions = []
-    R.forEach(x => { paymentOptions.push(
+    R.forEach(x => { 
+        var currencyCode = R.path(["paymentNetwork"], x)
+        paymentOptions.push(
             { 
-                'currencyCode': R.path(["paymentNetwork"], x),
+                'currencyCode': ((currencyCode === 'XRPL') ? "XRP" : currencyCode),
                 'address': R.path(["addressDetails", "address"], x)
             })
     }, addresses)
@@ -18,11 +20,6 @@ module.exports.getAddressMap = async function (payId){
 }
 
 module.exports.getCurrentExchangeRate = async function(paymentDocument) {
-
-    if (R.length(paymentDocument.paymentOptions) === 1 && R.equals(paymentDocument.paymentOptions.currencyCode, paymentDocument.requestedAmount.currencyCode)){
-        return paymentOptions
-    }
-    
     /*
     paymentDocument = {
         requestedAmount: {
@@ -40,22 +37,42 @@ module.exports.getCurrentExchangeRate = async function(paymentDocument) {
                 },
             ]
     }*/
-    const paymentOptions = paymentDocument.paymentOptions
+    var paymentOptions = paymentDocument.paymentOptions
+    const requestedValue = R.path(['requestedAmount', 'value'], paymentDocument)
     const fsyms = paymentDocument.requestedAmount.currencyCode
-    const tsyms = R.join(',', R.reduce((acc, option) => { acc.push(option.currencyCode); return acc }, [], paymentOptions)) // get string of all possible options
-    const fxRate = await retrieveLatestConversion(fsyms, tsyms)
-    R.forEach(x => { 
-        x.value = R.path(['requestedAmount', 'value'], paymentDocument) * R.path([x.currencyCode], fxRate)
-     },
-    paymentOptions)
-    return paymentOptions
+    const tsyms = R.join(',', R.reduce((acc, option) => {acc.push(option.currencyCode); return acc }, [], paymentOptions)) // get string of all possible options
+    if(R.equals(fsyms, tsyms))
+        return paymentOptions
+    return processConversion(fsyms, tsyms, paymentOptions, requestedValue, R.path(['requestedAmount', 'currencyCode'], paymentDocument))
+}
+
+const processConversion = async function(fsyms, tsyms, paymentOptions, requestedValue, requestedCurrency) { 
+    retrieveLatestConversion(fsyms, tsyms).then((data) => {
+        const fxRate = data[requestedCurrency]
+        R.forEach(x => { 
+            x.value = requestedValue * R.path([x.currencyCode], fxRate)
+            },
+        paymentOptions)
+        return paymentOptions
+    }) .catch(err => {
+        logger.error("Error retrieving cryptocompare conversions")
+        console.log(err)
+        console.log(paymentOptions)
+        return paymentOptions
+    })
 }
 
 const retrieveLatestConversion = async function (fsyms, tsyms) {
     return new Promise((resolve, reject) => {
         axios.get(`https://min-api.cryptocompare.com/data/pricemulti?fsyms=${fsyms}&tsyms=${tsyms}&api-key=${process.env.CRYPTOCOMPARE_KEY}`)
         .then((response) => {
-            return resolve(response.data[fsyms])
-        }).catch((err) => { logger.error(err); reject(err)})
+            if(R.equals(R.path(['data', 'Response'], response), 'Error')){
+                console.log(response.data)
+                return reject('Incorrect Currency code')
+
+            } 
+            console.log(response.data)
+            return resolve(response.data)
+        }).catch((err) => { logger.error(err); return reject(err)})
     })
 }
