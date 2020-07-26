@@ -4,15 +4,15 @@ const express = require('express')
 var bodyParser = require('body-parser')
 const connect = require('./app/services/database')
 const { logger, middlewareLogger } = require('./app/services/logging')
-const cors = require('cors')
-
+const cors = require('cors');
 
 var app = express();
+
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
-  }));
+}));
 app.use(middlewareLogger)
 module.exports = app;
 
