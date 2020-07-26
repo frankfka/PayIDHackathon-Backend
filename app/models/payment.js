@@ -12,7 +12,10 @@ const PaymentSchema = new Schema({
   paymentOptions: [{
     currencyCode: { type: String},
     value: { type: Number },
-    address: { type: String }
+    paymentInfo: {
+      address: { type: String }, 
+      tag: { type: String }
+    }
   }]
 });
 

@@ -15,7 +15,7 @@ exports.create = async function(req, res) {
         })
 }
 
-exports.test_create = async function(req, res) {
+exports.testCreate = async function(req, res) {
     logger.info(`[PAYMENTS] Received payment test-create request`)
 
     req.body.name = "test"
@@ -30,6 +30,14 @@ exports.test_create = async function(req, res) {
         .catch(err => {
             res.status(500).send(`Error processing request: ${err.message}`)
         })
+}
+
+exports.getXpring = async function(req, res) {
+    currencyService.xpringTest().then((response) => {
+        res.send(response)
+    }).catch((err) => {
+        res.send(err)
+    })
 }
 
 exports.delete = async function(req, res) {

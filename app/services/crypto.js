@@ -5,18 +5,23 @@ const R = require('ramda');
 const axios = require('axios');
 
 
-module.exports.getAddressMap = async function (payId){
+module.exports.getAddressMap = async function(payId){
     const addresses = await payIdClient.allAddressesForPayId(payId)
     const paymentOptions = []
     R.forEach(x => { 
         var currencyCode = R.path(["paymentNetwork"], x)
+        currencyCode = ((currencyCode === 'XRPL') ? "XRP" : currencyCode) 
         paymentOptions.push(
             { 
-                'currencyCode': ((currencyCode === 'XRPL') ? "XRP" : currencyCode),
-                'address': R.path(["addressDetails", "address"], x)
+                'currencyCode': currencyCode,
+                'paymentInfo': R.path(["addressDetails"], x)
             })
     }, addresses)
     return paymentOptions
+}
+
+module.exports.XpringTest = async function() {
+    return payIdClient.allAddressesForPayId("frankfka$xpring.money")
 }
 
 module.exports.getCurrentExchangeRate = async function(paymentDocument) {
@@ -30,10 +35,12 @@ module.exports.getCurrentExchangeRate = async function(paymentDocument) {
                 {
                     currencyCode: 'BTC',
                     address: 12356567,
+                    
                 }, 
                 {
-                    currencyCode: 'ETH',
+                    currencyCode: 'ACH',
                     address: 12356567,
+                    tag: ''
                 },
             ]
     }*/
@@ -41,8 +48,10 @@ module.exports.getCurrentExchangeRate = async function(paymentDocument) {
     const requestedValue = R.path(['requestedAmount', 'value'], paymentDocument)
     const fsyms = paymentDocument.requestedAmount.currencyCode
     const tsyms = R.join(',', R.reduce((acc, option) => {acc.push(option.currencyCode); return acc }, [], paymentOptions)) // get string of all possible options
-    if(R.equals(fsyms, tsyms))
+    if(R.equals(fsyms, tsyms)){
+        paymentOptions[0].value = requestedValue
         return paymentOptions
+    }
     return processConversion(fsyms, tsyms, paymentOptions, requestedValue, R.path(['requestedAmount', 'currencyCode'], paymentDocument))
 }
 
@@ -69,7 +78,6 @@ const retrieveLatestConversion = async function (fsyms, tsyms) {
             if(R.equals(R.path(['data', 'Response'], response), 'Error')){
                 console.log(response.data)
                 return reject('Incorrect Currency code')
-
             } 
             console.log(response.data)
             return resolve(response.data)
