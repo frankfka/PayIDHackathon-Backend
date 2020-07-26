@@ -3,7 +3,7 @@ const paymentService = require('../services/payments')
 module.exports = function(app) {
     app.get('/pages/:id', (req, res) => paymentService.find(req, res))
 
-    app.delete('/pages/:id', (req,res) => pa)
+    app.delete('/pages/:id', (req,res) => paymentService.delete(req, res))
     
     app.post('/pages', (req, res) => paymentService.create(req, res))
 
