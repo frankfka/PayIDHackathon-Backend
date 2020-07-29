@@ -7,10 +7,8 @@ exports.create = async function(req, res) {
     logger.info(`[PAYMENTS] Received payment create request`)
 
     try {
-        req.body.paymentOptions = await currencyService.getAddressMap(R.path(['requestedAmount'], req.body), req.body.payId)
         const savedFile = await Payment.create(req.body)
         res.json(savedFile._id)
-
     } catch(err) {
         res.status(500).send(`Error creating a new page: ${err.message}`)
         logger.error(`Error creating new page: ${err}`)
@@ -22,8 +20,6 @@ exports.testCreate = async function(req, res) {
 
     req.body.name = "test"
     req.body.customMessage = "test"
-
-    req.body.paymentOptions = await currencyService.getAddressMap(R.pathOr(null, ['requestedAmount'], req.body), "frankfka$xpring.money");
 
     Payment.create(req.body)
         .then((savedFile) => {
@@ -63,6 +59,8 @@ exports.find = async function(req, res) {
         .then(async (result) => { 
             if(R.isEmpty(result)) { res.status(404).send(`Could not find payment for id: ${req.params.id}`); return }
             var document = result[0]
+            document.paymentOptions = await currencyService.getAddressMap(R.pathOr(null, ['requestedAmount'], document), document.payId);
+            console.log(document.paymentOptions)
             currencyService.getCurrentExchangeRate(document)
                 .then((payOptions) => {
                     document.paymentOptions = payOptions

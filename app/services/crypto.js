@@ -3,7 +3,6 @@ const { logger } = require('./logging');
 const payIdClient = new PayIdClient();
 const R = require('ramda');
 const axios = require('axios');
-const payment = require('../models/payment');
 
     /*
     paymentDocument = {
@@ -33,7 +32,12 @@ const payment = require('../models/payment');
     }*/
 
 module.exports.getAddressMap = async function(requestedAmount, payId){
-    const addresses = await payIdClient.allAddressesForPayId(payId)
+    let addresses = []
+    try{
+        addresses = await payIdClient.allAddressesForPayId(payId)
+    } catch(err) {
+        console.log(`Failure: ${err}`)
+    }
     let requestedCurrency = R.pathOr(null, ['currencyCode'], requestedAmount)
     let requestedValue = R.pathOr(null, ['value'], requestedAmount)
 
@@ -60,17 +64,18 @@ module.exports.xpringTest = async function() {
 module.exports.getCurrentExchangeRate = async function(paymentDocument) {
 
     return new Promise((resolve, reject) => {
+        // necessary for some reason, consider an alternative lmao
         paymentDocument.paymentOptions = JSON.parse(JSON.stringify(paymentDocument.paymentOptions))
 
         // no value or currency code
         if (R.or(R.isNil(paymentDocument.requestedAmount.currencyCode), R.isNil(paymentDocument.requestedAmount.value))) return resolve(paymentDocument.paymentOptions);
 
         const requestedValue = R.path(['requestedAmount', 'value'], paymentDocument)
-        const fsyms = paymentDocument.requestedAmount.currencyCode
-        const tsyms = R.join(',', R.reduce((acc, option) => {acc.push(option.currencyCode); return acc }, [], paymentDocument.paymentOptions)) // get string of all possible options
+        const fsyms = paymentDocument.requestedAmount.currencyCode || null 
+        const tsyms = R.join(',', R.reduce((acc, option) => {acc.push(option.currencyCode); return acc }, [], paymentDocument.paymentOptions)) || null // get string of all possible options
 
         // only payment option is requestedAmount.currencyCode
-        if(R.equals(fsyms, tsyms)){
+        if(R.equals(fsyms, tsyms) || R.isNil(tsyms) || R.isNil(fsyms)){
             return resolve(paymentDocument.paymentOptions)
         }
 
@@ -83,7 +88,6 @@ module.exports.getCurrentExchangeRate = async function(paymentDocument) {
 }
 
 const processConversion = async function(fsyms, tsyms, paymentOptions, requestedValue, requestedCurrency) { 
-    console.log(`processConversion: ${paymentOptions}`)
     return new Promise((resolve, reject) => {
         retrieveLatestConversion(fsyms, tsyms)
             .then((data) => {
@@ -110,12 +114,13 @@ const retrieveLatestConversion = async function (fsyms, tsyms) {
         axios.get(`https://min-api.cryptocompare.com/data/pricemulti?fsyms=${fsyms}&tsyms=${tsyms}&api-key=${process.env.CRYPTOCOMPARE_KEY}`)
             .then((response) => {
                 if(R.equals(R.path(['data', 'Response'], response), 'Error')){
-                    logger.error(response.data)
+                    logger.error(JSON.stringify(response.data))
                     return reject('Incorrect Currency code')
                 } 
-                console.log(response.data)
                 return resolve(response.data)
             })
-            .catch((err) => { logger.error(err); return reject(err)})
+            .catch((err) => {
+                 logger.error(err.message); return reject(err)
+            })
     })
 }
