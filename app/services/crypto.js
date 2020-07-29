@@ -3,28 +3,8 @@ const { logger } = require('./logging');
 const payIdClient = new PayIdClient();
 const R = require('ramda');
 const axios = require('axios');
+const payment = require('../models/payment');
 
-
-module.exports.getAddressMap = async function(payId){
-    const addresses = await payIdClient.allAddressesForPayId(payId)
-    const paymentOptions = []
-    R.forEach(x => { 
-        var currencyCode = R.path(["paymentNetwork"], x)
-        currencyCode = ((currencyCode === 'XRPL') ? "XRP" : currencyCode) 
-        paymentOptions.push(
-            { 
-                'currencyCode': currencyCode,
-                'paymentInfo': R.path(["addressDetails"], x)
-            })
-    }, addresses)
-    return paymentOptions
-}
-
-module.exports.xpringTest = async function() {
-    return payIdClient.allAddressesForPayId("frankfka$xpring.money")
-}
-
-module.exports.getCurrentExchangeRate = async function(paymentDocument) {
     /*
     paymentDocument = {
         requestedAmount: {
@@ -52,43 +32,90 @@ module.exports.getCurrentExchangeRate = async function(paymentDocument) {
             ]
     }*/
 
-    var paymentOptions = paymentDocument.paymentOptions
-    const requestedValue = R.path(['requestedAmount', 'value'], paymentDocument)
-    const fsyms = paymentDocument.requestedAmount.currencyCode
-    const tsyms = R.join(',', R.reduce((acc, option) => {acc.push(option.currencyCode); return acc }, [], paymentOptions)) // get string of all possible options
-    if(R.equals(fsyms, tsyms)){
-        paymentOptions[0].value = requestedValue
-        return paymentOptions
-    }
-    return processConversion(fsyms, tsyms, paymentOptions, requestedValue, R.path(['requestedAmount', 'currencyCode'], paymentDocument))
+module.exports.getAddressMap = async function(requestedAmount, payId){
+    const addresses = await payIdClient.allAddressesForPayId(payId)
+    let requestedCurrency = R.pathOr(null, ['currencyCode'], requestedAmount)
+    let requestedValue = R.pathOr(null, ['value'], requestedAmount)
+
+    const paymentOptions = []
+    R.forEach(x => { 
+        let currencyCode = R.path(["paymentNetwork"], x)
+        currencyCode = ((currencyCode === 'XRPL') ? "XRP" : currencyCode) 
+        let currValue = ((R.equals(requestedCurrency, currencyCode)) ? requestedValue : null)
+
+        paymentOptions.push(
+            { 
+                'currencyCode': currencyCode,
+                'paymentInfo': R.path(["addressDetails"], x),
+                'value' : currValue
+            })
+    }, addresses)
+    return paymentOptions
+}
+
+module.exports.xpringTest = async function() {
+    return payIdClient.allAddressesForPayId("frankfka$xpring.money")
+}
+
+module.exports.getCurrentExchangeRate = async function(paymentDocument) {
+
+    return new Promise((resolve, reject) => {
+        paymentDocument.paymentOptions = JSON.parse(JSON.stringify(paymentDocument.paymentOptions))
+
+        // no value or currency code
+        if (R.or(R.isNil(paymentDocument.requestedAmount.currencyCode), R.isNil(paymentDocument.requestedAmount.value))) return resolve(paymentDocument.paymentOptions);
+
+        const requestedValue = R.path(['requestedAmount', 'value'], paymentDocument)
+        const fsyms = paymentDocument.requestedAmount.currencyCode
+        const tsyms = R.join(',', R.reduce((acc, option) => {acc.push(option.currencyCode); return acc }, [], paymentDocument.paymentOptions)) // get string of all possible options
+
+        // only payment option is requestedAmount.currencyCode
+        if(R.equals(fsyms, tsyms)){
+            return resolve(paymentDocument.paymentOptions)
+        }
+
+        processConversion(fsyms, tsyms, paymentDocument.paymentOptions, requestedValue, R.path(['requestedAmount', 'currencyCode'], paymentDocument))
+            .then((result) => {
+                return resolve(result)
+            })
+            .catch(err => resolve(paymentDocument.paymentOptions))
+    })
 }
 
 const processConversion = async function(fsyms, tsyms, paymentOptions, requestedValue, requestedCurrency) { 
-    retrieveLatestConversion(fsyms, tsyms).then((data) => {
-        const fxRate = data[requestedCurrency]
-        R.forEach(x => { 
-            x.value = requestedValue * R.path([x.currencyCode], fxRate)
-            },
-        paymentOptions)
-        return paymentOptions
-    }) .catch(err => {
-        logger.error("Error retrieving cryptocompare conversions")
-        console.log(err)
-        console.log(paymentOptions)
-        return paymentOptions
+    console.log(`processConversion: ${paymentOptions}`)
+    return new Promise((resolve, reject) => {
+        retrieveLatestConversion(fsyms, tsyms)
+            .then((data) => {
+                const fxRate = data[requestedCurrency]
+                var result = []
+                R.forEach(x => { 
+                    x.value = requestedValue * R.path([x.currencyCode], fxRate)
+                    result.push(x)
+                    },
+                paymentOptions)
+
+                return resolve(result)
+            })
+            .catch(err => {
+                logger.error("Error retrieving cryptocompare conversions")
+                reject(err)
+            })
     })
+    
 }
 
 const retrieveLatestConversion = async function (fsyms, tsyms) {
     return new Promise((resolve, reject) => {
         axios.get(`https://min-api.cryptocompare.com/data/pricemulti?fsyms=${fsyms}&tsyms=${tsyms}&api-key=${process.env.CRYPTOCOMPARE_KEY}`)
-        .then((response) => {
-            if(R.equals(R.path(['data', 'Response'], response), 'Error')){
+            .then((response) => {
+                if(R.equals(R.path(['data', 'Response'], response), 'Error')){
+                    logger.error(response.data)
+                    return reject('Incorrect Currency code')
+                } 
                 console.log(response.data)
-                return reject('Incorrect Currency code')
-            } 
-            console.log(response.data)
-            return resolve(response.data)
-        }).catch((err) => { logger.error(err); return reject(err)})
+                return resolve(response.data)
+            })
+            .catch((err) => { logger.error(err); return reject(err)})
     })
 }

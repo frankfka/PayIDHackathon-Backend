@@ -6,17 +6,10 @@ const PaymentSchema = new Schema({
   payId: { type: String, required: true },
   customMessage: { type: String }, 
   requestedAmount: {
-    value: { type: Number, required: true },
-    currencyCode: { type: String, required: true }
-  },
-  paymentOptions: [{
-    currencyCode: { type: String},
     value: { type: Number },
-    paymentInfo: {
-      address: { type: String }, 
-      tag: { type: String }
-    }
-  }]
+    currencyCode: { type: String }
+  },
+  paymentOptions: []
 });
 
 PaymentSchema.method({});

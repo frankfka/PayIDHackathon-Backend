@@ -6,13 +6,15 @@ const { logger } = require('./logging')
 exports.create = async function(req, res) {
     logger.info(`[PAYMENTS] Received payment create request`)
 
-    Payment.create(req.body)
-        .then((savedFile) => {
-            res.json(savedFile._id)
-        })
-        .catch(err => {
-            res.status(500).send(`Error processing request: ${err.message}`)
-        })
+    try {
+        req.body.paymentOptions = await currencyService.getAddressMap(R.path(['requestedAmount'], req.body), req.body.payId)
+        const savedFile = await Payment.create(req.body)
+        res.json(savedFile._id)
+
+    } catch(err) {
+        res.status(500).send(`Error creating a new page: ${err.message}`)
+        logger.error(`Error creating new page: ${err}`)
+    }
 }
 
 exports.testCreate = async function(req, res) {
@@ -21,7 +23,7 @@ exports.testCreate = async function(req, res) {
     req.body.name = "test"
     req.body.customMessage = "test"
 
-    req.body.paymentOptions = await currencyService.getAddressMap("frankfka$xpring.money");
+    req.body.paymentOptions = await currencyService.getAddressMap(R.pathOr(null, ['requestedAmount'], req.body), "frankfka$xpring.money");
 
     Payment.create(req.body)
         .then((savedFile) => {
@@ -61,12 +63,19 @@ exports.find = async function(req, res) {
         .then(async (result) => { 
             if(R.isEmpty(result)) { res.status(404).send(`Could not find payment for id: ${req.params.id}`); return }
             var document = result[0]
-            document.paymentOptions = await currencyService.getCurrentExchangeRate(document)
-            res.send(document)
+            currencyService.getCurrentExchangeRate(document)
+                .then((payOptions) => {
+                    document.paymentOptions = payOptions
+                    res.send(document)
+                })
+                .catch(err => {
+                    res.status(500).send(`Error processing request`)
+                    logger.error(`[ERROR] Error searching for payment id: ${req.params.id}, ${err.message}`)
+                })
         })
         .catch(err => {
             res.status(500).send(`Error processing request`)
-            logger.error(`[ERROR] Error searching for payment id: ${req.params.id}: ${err.message}`)
+            logger.error(`[ERROR] Error searching for payment id: ${req.params.id}, ${err.message}`)
         })
 }
 
@@ -75,4 +84,12 @@ exports.verify = async function(req, res) {
     // Find payment via req.params.id
     // Retrieve paymentHistory for payId and check if transaction hash in list 
 
+}
+
+const getPaymentWithLatestValues = (req) => {
+    return new Promise((resolve, reject) => {
+
+        
+        
+    })
 }
