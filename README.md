@@ -1,4 +1,10 @@
-# Endpoints 
+# xPayments - PayID Hackathon Submission
+
+This is the NodeJS backend for xPayments, a submission to the [PayID Hackathon](https://payid.devpost.com/). 
+
+xPayments is a central gateway for cryptocurrency payment information, powered by PayID. See the Devpost submission [here](https://devpost.com/software/xpayments-me).
+
+## Endpoints 
 
 ### POST /pages 
 - create a new page
@@ -14,7 +20,7 @@
 ### POST /test/xpring 
 - no content needed to post, just retrieves the xpring request for frankfka$xpring.money
 
-# API Spec 
+## API Spec 
 
 ### Create New Page 
 ```json
