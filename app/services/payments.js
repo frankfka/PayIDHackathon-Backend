@@ -83,11 +83,3 @@ exports.verify = async function(req, res) {
     // Retrieve paymentHistory for payId and check if transaction hash in list 
 
 }
-
-const getPaymentWithLatestValues = (req) => {
-    return new Promise((resolve, reject) => {
-
-        
-        
-    })
-}
